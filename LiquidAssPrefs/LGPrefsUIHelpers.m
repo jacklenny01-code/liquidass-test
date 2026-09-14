@@ -3,10 +3,6 @@
 #import "../Shared/LGLiveBackdropView.h"
 #import "../Shared/LGSharedSupport.h"
 #import "../Shared/LGFramework.h"
-#if !TARGET_OS_SIMULATOR
-#import <AltList/ATLApplicationListMultiSelectionController.h>
-#endif
-#import <Preferences/PSSpecifier.h>
 #import <notify.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
@@ -1551,36 +1547,30 @@ void LGPresentThirdPartyRWBEditor(UIViewController *controller) {
 }
 
 static void LGPresentAppList(UIViewController *controller, NSString *key,
-                             NSString *title, NSArray<NSString *> *defaults) {
-#if TARGET_OS_SIMULATOR
-    LGPresentInfoSheet(controller, title, @"app selection is unavailable in the simulator");
-    return;
-#else
-    PSSpecifier *specifier = [PSSpecifier preferenceSpecifierNamed:title
-        target:controller
-        set:@selector(setAppExclusions:specifier:)
-        get:@selector(readAppExclusions:)
-        detail:nil
-        cell:PSLinkListCell
-        edit:nil];
-    [specifier setProperty:key forKey:@"key"];
-    [specifier setProperty:defaults forKey:@"default"];
-    [specifier setProperty:@[@{ @"sectionType": @"Visible" }] forKey:@"sections"];
-    [specifier setProperty:@YES forKey:@"useSearchBar"];
-    [specifier setProperty:@YES forKey:@"includeIdentifiersInSearch"];
-    [specifier setProperty:@YES forKey:@"showIdentifiersAsSubtitle"];
+                             NSString *title, NSString *body, NSString *placeholder,
+                             NSArray<NSString *> *defaults) {
+    id stored = LGReadPreferenceObject(key, defaults);
+    NSArray *storedIdentifiers = [stored isKindOfClass:NSArray.class] ? stored : defaults;
+    NSString *existing = [storedIdentifiers componentsJoinedByString:@"\n"];
 
-    ATLApplicationListMultiSelectionController *list =
-        [ATLApplicationListMultiSelectionController new];
-    [list setSpecifier:specifier];
-    list.title = title;
-    [controller.navigationController pushViewController:list animated:YES];
-#endif
+    LGPresentMultilineTextInputSheet(controller, title, body, existing, placeholder,
+                                     ^(NSString *text) {
+        NSMutableOrderedSet<NSString *> *entries = [NSMutableOrderedSet orderedSet];
+        NSCharacterSet *separators = [NSCharacterSet characterSetWithCharactersInString:@"\n,;"];
+        for (NSString *rawEntry in [text componentsSeparatedByCharactersInSet:separators]) {
+            NSString *entry = [rawEntry stringByTrimmingCharactersInSet:
+                NSCharacterSet.whitespaceAndNewlineCharacterSet];
+            if (entry.length) [entries addObject:entry];
+        }
+        LGWritePreferenceObject(key, entries.array);
+    });
 }
 
 void LGPresentGlobalControlsAppList(UIViewController *controller) {
     LGPresentAppList(controller, @"GlobalControls.Exclusions",
                      LGLocalized(@"prefs.global_controls.exclusions.title"),
+                     LGLocalized(@"prefs.global_controls.exclusions.body"),
+                     LGLocalized(@"prefs.global_controls.exclusions.placeholder"),
                      @[@"ws.hbang.Terminal", @"com.tigisoftware.Filza",
                        @"com.zhiliaoapp.musically", @"com.hammerandchisel.discord",
                        @"com.spotify.client"]);
@@ -1589,6 +1579,8 @@ void LGPresentGlobalControlsAppList(UIViewController *controller) {
 void LGPresentTabBarAppList(UIViewController *controller) {
     LGPresentAppList(controller, @"TabBar.Exclusions",
                      LGLocalized(@"prefs.tab_bar.exclusions.title"),
+                     LGLocalized(@"prefs.tab_bar.exclusions.body"),
+                     LGLocalized(@"prefs.tab_bar.exclusions.placeholder"),
                      @[@"com.zhiliaoapp.musically"]);
 }
 
