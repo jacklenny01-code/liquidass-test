@@ -662,16 +662,6 @@ static void ctxScheduleLayoutProbe(UIView *listView) {
 %end
 
 %hook _UIContextMenuCell
-- (UICollectionViewLayoutAttributes *)preferredLayoutAttributesFittingAttributes:
-    (UICollectionViewLayoutAttributes *)attributes {
-    UICollectionViewLayoutAttributes *fitted = %orig;
-    if (lgHostEnabled(@"ContextMenu")) {
-        CGSize size = fitted.size;
-        size.height = kCtxRowHeight;
-        fitted.size = size;
-    }
-    return fitted;
-}
 - (void)layoutSubviews {
     %orig;
     if (lgHostEnabled(@"ContextMenu"))
