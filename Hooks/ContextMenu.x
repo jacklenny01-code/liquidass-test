@@ -600,6 +600,14 @@ static void ctxScheduleLayoutProbe(UIView *listView) {
 %end
 
 %hook _UIContextMenuListView
+- (CGSize)preferredContentSizeWithinContainerSize:(CGSize)containerSize {
+    CGSize size = %orig;
+    if (lgHostEnabled(@"ContextMenu")) {
+        size.width = MIN(containerSize.width, size.width + kCtxContentInset * 2.0);
+        size.height = MIN(containerSize.height, size.height + kCtxContentInset * 2.0);
+    }
+    return size;
+}
 - (void)didAddSubview:(UIView *)subview {
     %orig;
     if (!lgHostEnabled(@"ContextMenu")) { restoreContextMenuSubtree((UIView *)self); return; }
@@ -611,14 +619,22 @@ static void ctxScheduleLayoutProbe(UIView *listView) {
 - (void)layoutSubviews {
     %orig;
     if (lgHostEnabled(@"ContextMenu")) {
-        if (contextMenuNeedsLegacyInsetWorkaround()) {
-            UICollectionView *collection = (UICollectionView *)findDescendantMatching(
-                (UIView *)self, ^BOOL(UIView *view) {
-                    return [view isKindOfClass:UICollectionView.class];
-            });
-            for (UIView *view = collection.superview; view && view != (UIView *)self; view = view.superview) {
-                ctxRememberVisualState(view);
-                view.clipsToBounds = NO;
+        UICollectionView *collection = (UICollectionView *)findDescendantMatching(
+            (UIView *)self, ^BOOL(UIView *view) {
+                return [view isKindOfClass:UICollectionView.class];
+        });
+        if (collection) {
+            CGRect frame = collection.frame;
+            frame.origin.x = kCtxContentInset;
+            frame.origin.y = kCtxContentInset;
+            frame.size.width = MAX(0.0, CGRectGetWidth(collection.superview.bounds) -
+                                         kCtxContentInset * 2.0);
+            collection.frame = frame;
+            if (contextMenuNeedsLegacyInsetWorkaround()) {
+                for (UIView *view = collection.superview; view && view != (UIView *)self; view = view.superview) {
+                    ctxRememberVisualState(view);
+                    view.clipsToBounds = NO;
+                }
             }
         }
         styleContextMenuListSubviews((UIView *)self);
